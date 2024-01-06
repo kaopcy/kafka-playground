@@ -1,18 +1,20 @@
 import { AppDatasource } from "../libs/db";
 import { User } from "../models/user";
+import { CreateUser } from "../models/user/type";
 import { withMeasurementLog } from "../util/decorator/withMeasurementLog";
 
 const repository = AppDatasource.getRepository(User);
-
-interface CreateUserInput {
-    name: string;
-}
 
 class UserRepository {
     constructor() {}
 
     @withMeasurementLog
-    async create(inputUser: CreateUserInput): Promise<User> {
+    async createIfNotExist(inputUser: CreateUser): Promise<User> {
+        const insertResult = await repository.findOne({
+            where: { email: inputUser.email },
+        });
+        if (insertResult) return insertResult;
+
         return await repository.save(inputUser);
     }
 
@@ -27,7 +29,9 @@ class UserRepository {
     }
 
     @withMeasurementLog
-    async similarity(word: string): Promise<{ similarity: string; name: string }[]> {
+    async similarity(
+        word: string
+    ): Promise<{ similarity: string; name: string }[]> {
         const result: { similarity: string; name: string }[] = await repository
             .createQueryBuilder("user")
             .select(
@@ -46,8 +50,11 @@ class UserRepository {
         const result = await repository
             .createQueryBuilder("user")
             .select()
-            .where("to_tsvector('english', user.name) @@ to_tsquery('english',:word)" , { word })
-            .getMany()
+            .where(
+                "to_tsvector('english', user.name) @@ to_tsquery('english',:word)",
+                { word }
+            )
+            .getMany();
 
         return result;
     }
